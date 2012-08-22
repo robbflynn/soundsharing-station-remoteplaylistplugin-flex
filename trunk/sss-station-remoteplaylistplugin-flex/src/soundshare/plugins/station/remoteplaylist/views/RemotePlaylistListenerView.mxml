@@ -1,0 +1,508 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Panel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 implements="soundshare.sdk.plugins.view.IPluginView" 
+		 xmlns:components="soundshare.plugins.station.remoteplaylist.views.components.*"
+		 title="Playlist panel"
+		 resize="onResize(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.core.IUIComponent;
+			import mx.events.DragEvent;
+			import mx.events.ResizeEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			
+			import soundshare.station.data.StationContext;
+			import soundshare.plugins.station.remoteplaylist.listener.events.RemotePlaylistListenerEvent;
+			import soundshare.plugins.station.remoteplaylist.managers.listener.RemotePlaylistPluginListenerManager;
+			import soundshare.plugins.station.remoteplaylist.managers.listener.events.RemotePlaylistPluginListenerManagerEvent;
+			import soundshare.sdk.data.platlists.PlaylistContext;
+			import soundshare.sdk.data.track.TrackData;
+			import soundshare.sdk.managers.stations.events.StationsManagerEvent;
+			import soundshare.sdk.plugins.manager.IPluginManager;
+			import soundshare.sdk.plugins.manager.events.PluginManagerEvent;
+			import soundshare.sdk.plugins.view.events.PluginViewEvent;
+			
+			import spark.components.Application;
+			import spark.events.IndexChangeEvent;
+			
+			import utils.files.folder.FolderFilesReader;
+			
+			[Bindable] public var playOrders:ArrayCollection = new ArrayCollection([
+				{title: "Default", value: 0},
+				{title: "Repeat playlist", value: 1},
+				{title: "Shuffle", value: 2}
+			]);
+			
+			[Bindable] private var playlistsCollection:ArrayCollection = new ArrayCollection();
+			[Bindable] private var playlistCollection:ArrayCollection = new ArrayCollection();
+			[Bindable] private var context:StationContext;
+			
+			[Bindable] private var importPlaylistCollection:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var online:Boolean = true;
+			
+			[Bindable] private var local:Boolean = false;
+			[Bindable] private var isOwner:Boolean = false;
+			
+			[Bindable] private var playlistPanelShown:Boolean = false;
+			
+			[Bindable] private var errorText:String;
+			
+			private var pluginManager:RemotePlaylistPluginListenerManager;
+			
+			private var file:File = new File();
+			private var filesReader:FolderFilesReader = new FolderFilesReader(["mp3", "wav"]);
+			
+			public function show():void
+			{
+				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as Application, true);
+				PopUpManager.centerPopUp(this);
+				
+				trace("-RemotePlaylistListenerView[show]-", pluginManager.ready);
+				
+				currentState = "loading";
+				
+				pluginManager.addEventListener(PluginManagerEvent.READY, onReady);
+				pluginManager.addEventListener(PluginManagerEvent.ERROR, onError);
+				pluginManager.addEventListener(StationsManagerEvent.STATION_UP_DETECTED, onStationUpDetected);
+				pluginManager.addEventListener(StationsManagerEvent.STATION_DOWN_DETECTED, onStationDownDetected);
+				pluginManager.prepare();
+				
+				playlistsCollection.filterFunction = filterFunction;
+				playlistsCollection.addAll(new ArrayCollection([].concat(context.playlists.source)));
+				playlistsCollection.refresh();
+				
+				online = pluginManager.local;
+				dispatchEvent(new PluginViewEvent(PluginViewEvent.SHOWN));
+			}
+			
+			public function hide():void
+			{
+				pluginManager.removeEventListener(PluginManagerEvent.READY, onReady);
+				pluginManager.removeEventListener(PluginManagerEvent.ERROR, onError);
+				pluginManager.removeEventListener(StationsManagerEvent.STATION_UP_DETECTED, onStationUpDetected);
+				pluginManager.removeEventListener(StationsManagerEvent.STATION_DOWN_DETECTED, onStationDownDetected);
+				
+				pluginManager.removeEventListener(PluginManagerEvent.ERROR, onProcessErrors);
+				
+				pluginManager.removeEventListener(RemotePlaylistListenerEvent.SONG_CHANGED, onSongChanged);
+				pluginManager.removeEventListener(RemotePlaylistListenerEvent.STOP_PLAYING, onStopPlaying);
+				pluginManager.removeEventListener(RemotePlaylistListenerEvent.CONNECTION_CLOSED, onConnectionClosed);
+				
+				stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+				
+				pluginManager.destroy();
+				PopUpManager.removePopUp(this);
+				
+				playlistsCollection.removeAll();
+				dispatchEvent(new PluginViewEvent(PluginViewEvent.HIDDEN));
+			}
+			
+			protected function onReady(e:PluginManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(PluginManagerEvent.READY, onReady);
+				e.currentTarget.removeEventListener(PluginManagerEvent.ERROR, onError);
+				
+				pluginManager.addEventListener(PluginManagerEvent.ERROR, onProcessErrors);
+				
+				pluginManager.addEventListener(RemotePlaylistListenerEvent.SONG_CHANGED, onSongChanged);
+				pluginManager.addEventListener(RemotePlaylistListenerEvent.STOP_PLAYING, onStopPlaying);
+				pluginManager.addEventListener(RemotePlaylistListenerEvent.CONNECTION_CLOSED, onConnectionClosed);
+				
+				local = pluginManager.local;
+				isOwner = pluginManager.isOwner;
+				
+				playlistCollection.source = pluginManager.playlist;
+				
+				stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+				currentState = "player";
+			}
+			
+			private function onStationUpDetected(e:StationsManagerEvent):void
+			{
+				online = true;
+			}
+			
+			private function onStationDownDetected(e:StationsManagerEvent):void
+			{
+				online = false;	
+			}
+			
+			protected function onError(e:PluginManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(PluginManagerEvent.READY, onReady);
+				e.currentTarget.removeEventListener(PluginManagerEvent.ERROR, onError);
+				
+				errorText = e.error;
+				currentState = "error";
+			}
+			
+			private function onSongChanged(e:RemotePlaylistListenerEvent):void
+			{
+				songsGrid.selectedIndex = e.index;
+			}
+			
+			private function onStopPlaying(e:RemotePlaylistListenerEvent):void
+			{
+			}
+			
+			private function onConnectionClosed(e:RemotePlaylistListenerEvent):void
+			{
+				Alert.show("Connection is closed by the host.", "Error");
+			}
+			
+			protected function onPlaySong(event:MouseEvent):void
+			{
+				pluginManager.play(songsGrid.selectedIndex);
+			}
+			
+			protected function onStopSong(event:MouseEvent):void
+			{
+				pluginManager.stop();
+			}
+			
+			protected function onNextSong():void
+			{
+				pluginManager.next();
+				
+				songsGrid.selectedIndex = pluginManager.trackIndex;
+				songsGrid.scrollToIndex(pluginManager.trackIndex);
+			}
+			
+			protected function onPreviousSong():void
+			{
+				pluginManager.previous();
+				
+				songsGrid.selectedIndex = pluginManager.trackIndex;
+				songsGrid.scrollToIndex(pluginManager.trackIndex);
+			}
+			
+			protected function onChangePlayOrder():void
+			{
+				pluginManager.changePlayOrder(playOrderCb.selectedItem.value);
+			}
+			
+			protected function onChangeVolume():void
+			{
+				pluginManager.volume = volumeSlider.value;
+			}
+			
+			public function set manager(value:IPluginManager):void
+			{
+				pluginManager = value as RemotePlaylistPluginListenerManager;
+				context = pluginManager.context as StationContext;
+			}
+			
+			public function get manager():IPluginManager
+			{
+				return pluginManager;
+			}
+			
+			protected function onResize(event:ResizeEvent):void
+			{
+				PopUpManager.centerPopUp(this);
+			}
+			
+			protected function onProcessErrors(e:PluginManagerEvent):void
+			{
+				Alert.show(e.error, "Error");
+			}
+			
+			protected function onCloseError(event:MouseEvent):void
+			{
+				hide();
+			}
+			
+			protected function onTogglePlaylistPanel(event:MouseEvent):void
+			{
+				playlistPanelShown = !playlistPanelShown;
+				
+				if (playlistPanelShown)
+					loadImportPlaylist();
+				else
+					importPlaylistCollection.removeAll();
+			}
+			
+			private function loadImportPlaylist():void
+			{
+				importGridTxt.visible = true;
+				importSongsGrid.enabled = false;
+				
+				importPlaylistCollection.removeAll();
+				
+				pluginManager.addEventListener(RemotePlaylistPluginListenerManagerEvent.LOAD_PLAYLIST_COMPLETE, onLoadPlaylistComplete);
+				pluginManager.addEventListener(RemotePlaylistPluginListenerManagerEvent.LOAD_PLAYLIST_ERROR, onLoadPlaylistError);
+				pluginManager.loadPlaylist(importPlaylistsCb.selectedItem._id);
+			}
+			
+			protected function onLoadPlaylistComplete(e:RemotePlaylistPluginListenerManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_COMPLETE, onLoadPlaylistComplete);
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_ERROR, onLoadPlaylistError);
+				
+				importPlaylistCollection.addAll(new ArrayCollection(e.plylist));
+				
+				importGridTxt.visible = false;
+				importSongsGrid.enabled = true;
+			}
+			
+			protected function onLoadPlaylistError(e:RemotePlaylistPluginListenerManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_COMPLETE, onLoadPlaylistComplete);
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_ERROR, onLoadPlaylistError);
+				
+				importGridTxt.visible = false;
+				importSongsGrid.enabled = true;
+				
+				Alert.show("Unable to load playlist.");
+			}
+			
+			protected function removeSongs():void
+			{
+				var arr:Array = songsGrid.selectedItems;
+				
+				while (arr.length > 0)
+					playlistCollection.removeItemAt(playlistCollection.getItemIndex(arr.shift()));
+				
+				context.playlists.refresh();
+			}
+			
+			protected function removeAllSongs():void
+			{
+				playlistCollection.removeAll();
+				playlistCollection.refresh();
+			}
+			
+			protected function browseForSongs():void
+			{
+				file.browseForDirectory("Select media folder");
+				file.addEventListener(Event.SELECT, onSelectFolder);
+			}
+			
+			private function onSelectFolder(e:Event):void
+			{
+				file.removeEventListener(Event.SELECT, onSelectFolder);
+				
+				filesReader.addEventListener(Event.COMPLETE, onCompleteFilesList);
+				filesReader.read(file);
+			}
+			
+			protected function onCompleteFilesList(e:Event):void
+			{
+				e.currentTarget.removeEventListener(Event.COMPLETE, onCompleteFilesList);
+				
+				var td:TrackData;
+				var files:Array = filesReader.filesPaths;
+				filesReader.clear();
+				
+				for (var i:int = 0;i < files.length;i ++)
+				{
+					td = new TrackData();
+					td.accountId = context.accountData._id;
+					td.stationId = context.stationData._id;
+					td.path = files[i];
+					
+					playlistCollection.addItem(td);
+				}
+				
+				trace("onCompleteFilesList:", files.length);
+			}
+			
+			protected function saveSongs():void
+			{
+				pluginManager.addEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_COMPLETE, onSavePlaylistComplete);
+				pluginManager.addEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_ERROR, onSavePlaylistError);
+				pluginManager.saveSongs();
+			}
+			
+			protected function onSavePlaylistComplete(e:RemotePlaylistPluginListenerManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_COMPLETE, onSavePlaylistComplete);
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_ERROR, onSavePlaylistError);
+				
+				Alert.show("Save playlist complete.");
+			}
+			
+			protected function onSavePlaylistError(e:RemotePlaylistPluginListenerManagerEvent):void
+			{
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_COMPLETE, onSavePlaylistComplete);
+				e.currentTarget.removeEventListener(RemotePlaylistPluginListenerManagerEvent.SAVE_PLAYLIST_ERROR, onSavePlaylistError);
+				
+				Alert.show("Save playlist error.");
+			}
+			
+			private function filterFunction(item:Object):Boolean
+			{
+				return item.stationId == pluginManager.playlistContext.stationId && item._id != pluginManager.playlistContext._id;
+			}
+
+			protected function onImportPlaylistChanged(event:IndexChangeEvent):void
+			{
+				if (playlistPanelShown)
+					loadImportPlaylist();
+			}
+			
+			protected function onAddSongsToPlaylist(event:MouseEvent):void
+			{
+				if (importSongsGrid.selectedItem)
+					playlistCollection.addAll(new ArrayCollection(importSongsGrid.selectedItems));
+			}
+			
+			protected function onHideImportPlaylistPanel(event:MouseEvent):void
+			{
+				onTogglePlaylistPanel(null);
+			}
+			
+			protected function onKeyDown(e:KeyboardEvent):void
+			{
+				if (e.keyCode == Keyboard.DELETE)
+					removeSongs();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="init" />
+		<s:State name="loading" />
+		<s:State name="error" />
+		<s:State name="player" />
+		<s:State name="info" />
+	</s:states>
+	
+	<s:Label text="Loading..." includeIn="loading" paddingBottom="40" paddingLeft="80" paddingRight="80" paddingTop="40" />
+	
+	<s:VGroup includeIn="error" horizontalAlign="center" gap="30" paddingBottom="40" paddingLeft="60" paddingRight="80" paddingTop="60">
+		<s:Label text="{errorText}" />
+		<s:Button label="Close" click="onCloseError(event)" />
+	</s:VGroup>
+	
+	<s:VGroup width="850" includeIn="player" horizontalCenter="0" verticalCenter="0" gap="0">
+		<s:VGroup width="100%" paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15">
+			
+			<s:HGroup visible="{isOwner}" includeInLayout="{isOwner}" verticalAlign="middle">
+				<s:Label text="Playlist:" />
+				<s:ComboBox id="importPlaylistsCb" dataProvider="{playlistsCollection}" labelField="name" selectedIndex="0" 
+							change="onImportPlaylistChanged(event)"/>
+				<s:Button label="Toggle playlist" click="onTogglePlaylistPanel(event)" enabled="{playlistsCollection.length &gt; 0}"/>
+			</s:HGroup>
+			
+			<s:Group width="100%">
+				
+				<s:HGroup>
+					<s:Button label="&lt;" width="40" enabled="{songsGrid.selectedItem}"
+							  click="onPreviousSong()" />
+					<s:Button label="Play" enabled="{songsGrid.selectedItem}" 
+							  click="onPlaySong(event)"/>
+					<s:Button label="Stop" enabled="{songsGrid.selectedItem}" 
+							  click="onStopSong(event)"/>
+					<s:Button label="&gt;" width="40" enabled="{songsGrid.selectedItem}"
+							  click="onNextSong()" />
+				</s:HGroup>
+				
+				<s:HGroup right="0" verticalAlign="middle">
+					<s:HSlider id="volumeSlider" width="200" value="1" minimum="0" maximum="1" snapInterval="0.01" 
+							   change="onChangeVolume()"/>
+					<s:Label text="Order:" paddingLeft="20" />
+					<s:ComboBox id="playOrderCb" dataProvider="{playOrders}" labelField="title" selectedIndex="0"
+								change="onChangePlayOrder()"/>
+				</s:HGroup>
+				
+			</s:Group>
+			
+			
+			<s:VGroup width="100%">
+				
+				<s:Group width="100%" height="25">
+					<s:Rect width="100%" height="100%" radiusX="2" radiusY="2">
+						<s:fill>
+							<s:SolidColor color="0xe7e7e7" />
+						</s:fill>
+					</s:Rect>
+					
+					<s:HGroup left="7" verticalCenter="1">
+						<s:Label text="Now plaing:" fontWeight="bold" />
+						<s:Label id="currentSongTxt" text="..." />
+					</s:HGroup>
+					
+				</s:Group>
+				
+				<s:HGroup width="100%">
+					
+					<s:VGroup width="100%" height="100%" visible="{playlistPanelShown}" includeInLayout="{playlistPanelShown}">
+						<s:Group width="100%" height="100%">
+							<mx:DataGrid id="importSongsGrid" width="100%" height="100%" dataProvider="{importPlaylistCollection}" 
+										 enabled="false" 
+										 allowMultipleSelection="true"
+										 doubleClickEnabled="true"
+										 doubleClick="onAddSongsToPlaylist(event)"
+										 dragEnabled="true">
+								<mx:columns>
+									<mx:DataGridColumn dataField="path" headerText="Path" />
+								</mx:columns>
+							</mx:DataGrid>
+							
+							<s:Label id="importGridTxt" text="Loading..." horizontalCenter="0" verticalCenter="0" />
+							
+						</s:Group>
+						
+						<s:HGroup >
+							<s:Button label="Add to playlist" click="onAddSongsToPlaylist(event)" />
+							<s:Button label="Hide" click="onHideImportPlaylistPanel(event)" />
+						</s:HGroup>
+					</s:VGroup>
+					
+					<s:VGroup width="100%">
+						<mx:DataGrid id="songsGrid" dataProvider="{playlistCollection}" width="100%" rowCount="18" 
+									 allowMultipleSelection="true"
+									 doubleClickEnabled="true"
+									 dragMoveEnabled="true"
+									 dragEnabled="true"
+									 dropEnabled="true"
+									 doubleClick="onPlaySong(event)">
+							<mx:columns>
+								<mx:DataGridColumn dataField="path" headerText="Path" />
+							</mx:columns>
+						</mx:DataGrid>	
+						
+						<s:HGroup visible="{isOwner}" includeInLayout="{isOwner}">
+							<s:HGroup visible="{local}" includeInLayout="{local}">
+								<s:Button label="Browse folder" click="browseForSongs()" />
+								<s:Button label="Remove song(s)" click="removeSongs()" enabled="{songsGrid.selectedItem}" />
+								<s:Button label="Remove all songs" click="removeAllSongs()" enabled="{playlistCollection.length &gt; 0}" />
+							</s:HGroup>
+							<s:Button label="Save" click="saveSongs()" enabled="{playlistCollection.length &gt; 0}" />
+						</s:HGroup>
+					</s:VGroup>
+					
+				</s:HGroup>
+				
+			</s:VGroup>
+			
+		</s:VGroup>
+		
+		<s:Group width="100%">
+			<s:Rect width="100%" height="100%">
+				<s:fill>
+					<s:SolidColor color="0x666666" />
+				</s:fill>
+			</s:Rect>
+			
+			<s:HGroup width="100%" paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15">
+				<s:Group width="100%">
+					<s:Button label="Close" click="hide()" />
+					<components:OnlineIndicator id="onlineIndicator" online="{online}" right="0" />
+				</s:Group>
+			 </s:HGroup>	
+		</s:Group>
+	</s:VGroup>
+	
+</s:Panel>

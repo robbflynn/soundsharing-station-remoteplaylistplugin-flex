@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 currentState="offline"
+		 width="75" height="20">
+	
+	<fx:Script>
+		<![CDATA[
+			
+			private var _online:Boolean = false;
+			
+			public static const ONLINE:String = "online";
+			public static const OFFLINE:String = "offline";
+			public static const CONNECTING:String = "connecting";
+			
+			[Bindable] public var onlineText:String = "Online"; 
+			[Bindable] public var offlineText:String = "Offline";
+			[Bindable] public var connectingText:String = "Connecting...";
+			
+			[Bindable]
+			public function set online(value:Boolean):void
+			{
+				_online = value;
+				
+				if (value)
+					currentState = "online";
+				else
+					currentState = "offline";
+			}
+			
+			public function get online():Boolean
+			{
+				return _online;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="online" />
+		<s:State name="offline" />
+		<s:State name="connecting" />
+	</s:states>
+	
+	<s:Group width="100%" height="100%">
+		
+		<s:Rect width="100%" height="100%" radiusX="3" radiusY="3">
+			<s:fill>
+				<s:SolidColor color="0xe3e3e3" />
+			</s:fill>
+		</s:Rect>
+		
+		<s:VGroup left="5" verticalCenter="0">
+			<s:HGroup includeIn="connecting" verticalAlign="middle" left="7" verticalCenter="0">
+				<s:Rect width="12" height="12" radiusX="6" radiusY="6">
+					<s:fill>
+						<s:SolidColor color="0xffe00e" />
+					</s:fill>
+				</s:Rect>
+				<s:Label text="{connectingText}"  paddingTop="2"/>
+			</s:HGroup>
+			
+			<s:HGroup includeIn="online" verticalAlign="middle" left="5" verticalCenter="0">
+				<s:Rect width="12" height="12" radiusX="6" radiusY="6">
+					<s:fill>
+						<s:SolidColor color="0x14c114" />
+					</s:fill>
+				</s:Rect>
+				<s:Label text="{onlineText}" paddingTop="2" />
+			</s:HGroup>
+			
+			<s:HGroup includeIn="offline" verticalAlign="middle" left="5" verticalCenter="0">
+				<s:Rect width="12" height="12" radiusX="6" radiusY="6">
+					<s:fill>
+						<s:SolidColor color="0xe41a1a" />
+					</s:fill>
+				</s:Rect>
+				<s:Label text="{offlineText}"  paddingTop="2"/>
+			</s:HGroup>
+		</s:VGroup>
+	</s:Group>
+	
+</s:VGroup>

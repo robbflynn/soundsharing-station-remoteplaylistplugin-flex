@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  implements="soundshare.sdk.plugins.container.IPluginContainer">
+	
+	<fx:Script>
+		<![CDATA[
+			import soundshare.plugins.station.remoteplaylist.builders.RemotePlaylistPluginBuilder;
+			import soundshare.sdk.plugins.builder.IPluginBuilder;
+			
+			public static const testClass:Class = MovieClip;
+			
+			private var _pluginBuilder:RemotePlaylistPluginBuilder = new RemotePlaylistPluginBuilder();
+			
+			public function get pluginBuilder():IPluginBuilder
+			{
+				return _pluginBuilder;
+			}
+			
+		]]>
+	</fx:Script>
+	
+</s:Module>
