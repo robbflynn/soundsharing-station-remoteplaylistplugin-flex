@@ -2,7 +2,7 @@ package soundshare.plugins.station.remoteplaylist.managers.listener
 {
 	import flash.events.EventDispatcher;
 	
-	import socket.client.events.FlashSocketClientEvent;
+	import flashsocket.client.events.FlashSocketClientEvent;
 	
 	import soundshare.station.data.StationContext;
 	import soundshare.station.utils.debuger.Debuger;
@@ -278,7 +278,7 @@ package soundshare.plugins.station.remoteplaylist.managers.listener
 			dispatchEvent(new PluginManagerEvent(PluginManagerEvent.ERROR, null, "Unable to load playlist please try again.", 103));
 		}
 		
-		public function destroy():void
+		public function destroy(data:Object = null):void
 		{
 			reset();
 			dispatchEvent(new PluginManagerEvent(PluginManagerEvent.DESTROY));
@@ -764,6 +764,11 @@ package soundshare.plugins.station.remoteplaylist.managers.listener
 			}
 			else
 				localSoundPlayer.stop();
+		}
+		
+		public function match(data:Object):Object
+		{
+			return null;
 		}
 		
 		public function get playlistContext():PlaylistContext

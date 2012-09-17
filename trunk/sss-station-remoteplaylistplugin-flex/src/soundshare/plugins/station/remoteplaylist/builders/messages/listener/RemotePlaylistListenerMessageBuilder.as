@@ -1,6 +1,6 @@
 package soundshare.plugins.station.remoteplaylist.builders.messages.listener
 {
-	import socket.message.FlashSocketMessage;
+	import flashsocket.message.FlashSocketMessage;
 	
 	import soundshare.sdk.managers.events.SecureClientEventDispatcher;
 	

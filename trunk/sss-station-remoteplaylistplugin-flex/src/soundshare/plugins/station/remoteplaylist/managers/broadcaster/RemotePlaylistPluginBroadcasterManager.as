@@ -2,7 +2,7 @@ package soundshare.plugins.station.remoteplaylist.managers.broadcaster
 {
 	import flash.events.EventDispatcher;
 	
-	import socket.client.events.FlashSocketClientEvent;
+	import flashsocket.client.events.FlashSocketClientEvent;
 	
 	import soundshare.station.data.StationContext;
 	import soundshare.station.data.channels.RemoteChannelContext;
@@ -243,7 +243,7 @@ package soundshare.plugins.station.remoteplaylist.managers.broadcaster
 			destroy();
 		}
 		
-		public function destroy():void
+		public function destroy(data:Object = null):void
 		{
 			trace("--RemotePlaylistPluginBroadcasterManager[destroy]-");
 			
@@ -316,6 +316,11 @@ package soundshare.plugins.station.remoteplaylist.managers.broadcaster
 				stationContext.channels.removeItemAt(index);
 			
 			remoteChannelContext.clearObject();
+		}
+		
+		public function match(data:Object):Object
+		{
+			return null;
 		}
 		
 		public function set context(value:SoundShareContext):void

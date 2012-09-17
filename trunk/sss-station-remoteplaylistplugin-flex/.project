@@ -25,7 +25,7 @@
 		<link>
 			<name>bin-debug</name>
 			<type>2</type>
-			<location>E:/Work/Mixed/SoundSharing/trunk/SoundStation/bin-debug/data</location>
+			<location>E:/Work/Mixed/SoundSharing/soundstation/trunk/SoundStation/src/data</location>
 		</link>
 	</linkedResources>
 </projectDescription>

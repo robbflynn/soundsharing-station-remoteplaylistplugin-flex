@@ -2,7 +2,7 @@ package soundshare.plugins.station.remoteplaylist.listener.events
 {
 	import flash.events.Event;
 	
-	import socket.client.managers.events.events.ClientEventDispatcherEvent;
+	import flashsocket.client.managers.events.events.ClientEventDispatcherEvent;
 	
 	public class RemotePlaylistListenerEvent extends ClientEventDispatcherEvent
 	{
